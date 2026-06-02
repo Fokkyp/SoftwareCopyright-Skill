@@ -34,9 +34,9 @@ software-copyright-materials/
 
 | 生成流程 | 生成流程 |
 |---------|---------|
-| ![软著材料生成演示 1](docs/screenshots/demo-1.png) | ![软著材料生成演示 2](docs/screenshots/demo-2.png) |
-| ![软著材料生成演示 3](docs/screenshots/demo-3.png) | ![软著材料生成演示 4](docs/screenshots/demo-4.png) |
-| ![软著材料生成演示 5](docs/screenshots/demo-5.png) | ![软著材料生成演示 6](docs/screenshots/demo-6.png) |
+| ![软著材料生成演示 1](docs/assets/readme_screenshots/demo-1.png) | ![软著材料生成演示 2](docs/assets/readme_screenshots/demo-2.png) |
+| ![软著材料生成演示 3](docs/assets/readme_screenshots/demo-3.png) | ![软著材料生成演示 4](docs/assets/readme_screenshots/demo-4.png) |
+| ![软著材料生成演示 5](docs/assets/readme_screenshots/demo-5.png) | ![软著材料生成演示 6](docs/assets/readme_screenshots/demo-6.png) |
 
 ## 目录结构
 
@@ -212,7 +212,7 @@ python3 -m pip install python-docx
 
 著作权申请表按照以下图片填写。
 
-![著作权申请表填写示例](docs/screenshots/著作权申请表.png)
+![著作权申请表填写示例](docs/assets/readme_screenshots/著作权申请表.png)
 
 ### 申请流程
 
