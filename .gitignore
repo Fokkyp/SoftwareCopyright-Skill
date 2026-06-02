@@ -34,6 +34,8 @@ obj/
 !docs/
 !docs/screenshots/
 !docs/screenshots/*.png
+!docs/assets/
+!docs/assets/**/*.png
 
 # Office lock files
 ~$*.docx
