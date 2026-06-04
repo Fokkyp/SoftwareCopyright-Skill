@@ -20,13 +20,17 @@ MAX_MAIN_FUNCTION_CHARS = 1300
 
 FIELD_ORDER = [
     "软件全称",
+    "软件简称",
     "版本号",
-    "著作权人",
+    "软件分类",
     "开发完成日期",
+    "开发方式",
+    "软件说明",
+    "发表状态",
     "首次发表日期",
-    "权利取得方式",
+    "著作权人",
     "权利范围",
-    "开发情况说明",
+    "权利取得方式",
     "开发的硬件环境",
     "运行的硬件环境",
     "开发该软件的操作系统",
@@ -38,10 +42,8 @@ FIELD_ORDER = [
     "开发目的",
     "面向领域 / 行业",
     "软件的主要功能",
-    "技术特点",
-    "软件的技术特点选项",
+    "软件的技术特点",
     "页数",
-    "软件分类",
 ]
 
 
@@ -107,8 +109,11 @@ def summarize_features(analysis: dict[str, Any], software_name: str, business: d
 
     result = "".join(parts)
 
-    # Ensure minimum length
-    while len(result) < MIN_MAIN_FUNCTION_CHARS:
+    # Ensure minimum length (use stripped length to match write_application_md check)
+    def _effective_len(s: str) -> int:
+        return len(s.replace(" ", "").replace("\n", ""))
+
+    while _effective_len(result) < MIN_MAIN_FUNCTION_CHARS:
         padding = (
             "此外，系统还提供了配套的数据管理、用户操作记录、状态跟踪和系统配置等辅助功能模块，"
             "各个功能模块之间通过统一的界面布局和操作规范协同运行，用户可以在不同模块间灵活切换和处理跨模块的业务流程。"
@@ -120,7 +125,7 @@ def summarize_features(analysis: dict[str, Any], software_name: str, business: d
         )
         result += padding
 
-    if len(result) > MAX_MAIN_FUNCTION_CHARS:
+    if _effective_len(result) > MAX_MAIN_FUNCTION_CHARS:
         result = result[:MAX_MAIN_FUNCTION_CHARS]
 
     return result
@@ -173,30 +178,44 @@ def build_fields(
 
     defaults = {
         "软件全称": software_name_hint,
+        "软件简称": "",
         "版本号": version_hint,
+        "软件分类": (business.get("software_category") or "应用软件") if business else "应用软件",
+        "开发完成日期": "待用户确认（YYYY-MM-DD）",
+        "开发方式": (business.get("development_situation") or "单独开发") if business else "单独开发",
+        "软件说明": "原创",
+        "发表状态": "待用户确认（已发表/未发表）",
+        "首次发表日期": "待用户确认（YYYY-MM-DD，未发表则留空）",
         "著作权人": "待用户确认",
-        "开发完成日期": "待用户确认",
-        "首次发表日期": "待用户确认",
-        "权利取得方式": (business.get("rights_acquisition") or "原始取得") if business else "原始取得",
         "权利范围": (business.get("rights_scope") or "全部权利") if business else "全部权利",
-        "开发情况说明": (business.get("development_situation") or "独立开发") if business else "独立开发",
+        "权利取得方式": (business.get("rights_acquisition") or "原始取得") if business else "原始取得",
         "开发的硬件环境": hardware_hint,
         "运行的硬件环境": hardware_hint,
         "开发该软件的操作系统": dev_os_hint,
-        "软件开发环境 / 开发工具": infer_ide_name(project),
+        "软件开发环境 / 开发工具": f"开发环境: {dev_os_hint}/开发工具: {infer_ide_name(project)}",
         "该软件的运行平台 / 操作系统": infer_runtime_os(analysis),
         "软件运行支撑环境 / 支持软件": infer_runtime_support(analysis, project),
         "编程语言": language,
         "源程序量": str(manifest.get("source_line_count") or manifest.get("selected_source_line_count") or "待用户确认"),
-        "开发目的": (business.get("application_purpose") or f"建设{software_name}，为用户提供稳定、便捷的信息化操作能力，提升相关业务处理效率。") if business else f"建设{software_name}，为用户提供稳定、便捷的信息化操作能力，提升相关业务处理效率。",
+        "开发目的": (business.get("application_purpose") or f"待用户确认（≤50字符，需说明开发目的，不能只写软件名称）") if business else "待用户确认（≤50字符，需说明开发目的，不能只写软件名称）",
         "面向领域 / 行业": (business.get("industry") or "待用户确认") if business else "待用户确认",
         "软件的主要功能": (business.get("main_functions") or summarize_features(analysis, software_name, business)) if business else summarize_features(analysis, software_name, business),
-        "技术特点": (business.get("technical_characteristics") or f"系统采用{framework_text}构建前端界面，结合模块化组件、路由组织、接口封装和状态管理实现业务功能，具备较好的可维护性和扩展性。") if business else f"系统采用{framework_text}构建前端界面，结合模块化组件、路由组织、接口封装和状态管理实现业务功能，具备较好的可维护性和扩展性。",
-        "软件的技术特点选项": (business.get("software_technical_option") or "原创") if business else "原创",
+        "软件的技术特点": (business.get("technical_characteristics") or f"系统采用{framework_text}构建前端界面，结合模块化组件、路由组织、接口封装和状态管理实现业务功能") if business else f"系统采用{framework_text}构建前端界面，结合模块化组件、路由组织、接口封装和状态管理实现业务功能",
         "页数": str(manifest.get("total_pages") or "待用户确认"),
-        "软件分类": (business.get("software_category") or "应用软件") if business else "应用软件",
     }
     defaults.update({k: v for k, v in answers.items() if v})
+
+    # 未发表时首次发表日期应为空，不触发待确认门禁
+    publish_status = defaults.get("发表状态", "")
+    if "未发表" in publish_status and "已发表" not in publish_status:
+        if "待用户确认" in defaults.get("首次发表日期", "") or not defaults.get("首次发表日期", "").strip():
+            defaults["首次发表日期"] = ""
+
+    # 软件的主要功能：确保业务理解提供的内容也满足最低字数
+    main_func = defaults.get("软件的主要功能", "")
+    if main_func and "待用户确认" not in main_func and len(main_func) < MIN_MAIN_FUNCTION_CHARS:
+        defaults["软件的主要功能"] = summarize_features(analysis, software_name, business)
+
     return defaults
 
 
@@ -384,26 +403,30 @@ def has_support_term(items: list[str], term: str) -> bool:
 
 
 def infer_runtime_support(analysis: dict[str, Any], project: Path) -> str:
+    """Infer runtime support environment (≤50 chars plain text)."""
     package_info = load_project_package(project, analysis)
     package_path = (analysis.get("package") or {}).get("path") or ""
     deps = set((analysis.get("package") or {}).get("dependency_names") or [])
     frameworks = set(analysis.get("frameworks") or [])
+
     support: list[str] = []
     readme_requirements = extract_requirement_bullets(read_readme(project))
-    if readme_requirements:
-        support.extend(readme_requirements)
+
     if package_info or deps or frameworks & {"Vue", "React", "Vite", "Next.js", "Nuxt", "Svelte", "Astro", "Angular"}:
         if not has_support_term(support, "node"):
             node_engine = str((package_info.get("engines") or {}).get("node") or "").strip()
-            support.append(f"Node.js {node_engine}" if node_engine else "Node.js（按项目 package.json 要求确认版本）")
+            support.append(f"Node.js {node_engine}".strip() if node_engine else "Node.js")
         support.append(detect_package_manager(project, package_path))
-        support.append("Chrome、Edge 或 Safari 等现代浏览器")
+        support.append("现代浏览器")
+
     if ((project / "pyproject.toml").exists() or any(project.glob("*/pyproject.toml"))) and not has_support_term(support, "python"):
-        support.append("Python（按项目 pyproject.toml 要求确认版本）")
+        support.append("Python")
     if ((project / "requirements.txt").exists() or list(project.glob("*/requirements*.txt"))) and not has_support_term(support, "python"):
-        support.append("Python 依赖环境")
+        support.append("Python")
+
     if ((project / "docker-compose.yml").exists() or (project / "docker-compose.yaml").exists() or list(project.glob("docker-compose*.yml"))) and not has_support_term(support, "docker"):
-        support.append("Docker、Docker Compose")
+        support.append("Docker")
+
     compose_text = ""
     for compose in list(project.glob("docker-compose*.yml")) + list(project.glob("docker-compose*.yaml")):
         try:
@@ -414,17 +437,43 @@ def infer_runtime_support(analysis: dict[str, Any], project: Path) -> str:
         support.append("PostgreSQL")
     if "redis" in compose_text:
         support.append("Redis")
+
+    # Also incorporate readme requirements into support software
+    for req in readme_requirements:
+        if not has_support_term(support, req.split()[0].lower()):
+            support.append(req)
+
+    # Deduplicate
     unique: list[str] = []
     for item in support:
         clean = str(item).strip().rstrip("；;")
         if clean and clean not in unique:
             unique.append(clean)
-    if unique:
-        return "、".join(unique)
-    return "待用户确认"
+
+    if not unique:
+        return "待用户确认"
+
+    # Enforce ≤50 char limit: trim items if needed
+    result = "、".join(unique)
+    if len(result) > 50:
+        trimmed: list[str] = []
+        for item in unique:
+            candidate = "、".join(trimmed + [item])
+            if len(candidate) <= 50:
+                trimmed.append(item)
+            else:
+                break
+        result = "、".join(trimmed) if trimmed else unique[0][:50]
+    return result
 
 
 def write_application_md(path: Path, fields: dict[str, str], analysis: dict[str, Any], manifest: dict[str, Any], business: dict[str, Any] | None = None) -> None:
+    # 兜底：未发表时首次发表日期不应输出"待用户确认"，直接留空
+    publish_status = fields.get("发表状态", "")
+    if "未发表" in publish_status and "已发表" not in publish_status:
+        if "待用户确认" in (fields.get("首次发表日期") or "") or not (fields.get("首次发表日期") or "").strip():
+            fields["首次发表日期"] = ""
+
     lines = ["# 申请表信息", ""]
     for field in FIELD_ORDER:
         lines.append(f"➤{field}：{fields.get(field, '待用户确认')}")
@@ -452,18 +501,46 @@ def write_application_md(path: Path, fields: dict[str, str], analysis: dict[str,
         elif func_len > MAX_MAIN_FUNCTION_CHARS:
             warnings.append(f"软件的主要功能共 {func_len} 字符，超过建议上限 {MAX_MAIN_FUNCTION_CHARS} 字符。请精简。")
 
+    # Check character limits for fields with ≤50 or ≤100 constraints
+    char_limit_fields = {
+        "开发的硬件环境": 50,
+        "运行的硬件环境": 50,
+        "开发该软件的操作系统": 50,
+        "软件开发环境 / 开发工具": 50,
+        "该软件的运行平台 / 操作系统": 50,
+        "软件运行支撑环境 / 支持软件": 50,
+        "开发目的": 50,
+        "面向领域 / 行业": 50,
+        "软件的技术特点": 100,
+    }
+    for field_name, limit in char_limit_fields.items():
+        value = fields.get(field_name, "")
+        if value and "待用户确认" not in value and len(value) > limit:
+            warnings.append(f"{field_name}共 {len(value)} 字符，超过限制 {limit} 字符。请精简。")
+
     lines.extend(
         [
             "",
-            "## 环境字段填写口径",
+            "## 字段填写口径",
             "",
             "- 软件全称：必须由用户确认；最终正式资料文件名、代码页眉和操作手册中的软件名称均以本字段为准。",
-            "- 软件开发环境 / 开发工具：填写 IDE 或编辑器名称，例如 Visual Studio Code、WebStorm、IntelliJ IDEA、Cursor。",
-            "- 版本号：必须由用户确认；如果项目版本小于 V1.0，软著首次提交通常建议使用 V1.0，也可按实际项目版本填写，最终以前面“版本号”字段为准。",
-            "- 开发该软件的操作系统：填写实际开发电脑的操作系统版本，例如 macOS 14、macOS 15、Windows 10、Windows 11。",
-            "- 该软件的运行平台 / 操作系统：填写软件客户端或服务运行所在的操作系统版本，例如 Windows 10/11 或 macOS 13及以上版本。",
-            "- 软件运行支撑环境 / 支持软件：填写项目运行所需的软件环境，例如 Node.js、Python、Docker、数据库、浏览器、中间件或外部服务。",
-            "- 开发的硬件环境和运行的硬件环境：可使用当前检测到的电脑配置作为建议值，也可按实际开发、部署或审核口径调整。",
+            "- 软件简称：可选；如有常用简称则填写。",
+            "- 版本号：必须由用户确认；如果项目版本小于 V1.0，软著首次提交通常建议使用 V1.0，也可按实际项目版本填写，最终以本字段为准。",
+            "- 软件分类：应用软件/嵌入式软件/中间件/系统软件/其他。",
+            "- 开发完成日期、首次发表日期：必须使用 YYYY-MM-DD 格式。",
+            "- 开发方式：单独开发/合作开发/委托开发/下达任务开发。",
+            "- 软件说明：原创 / 修改（含翻译软件、合成软件）。",
+            "- 发表状态：已发表或未发表；已发表需附首次发表日期。",
+            "- 软件开发环境 / 开发工具：≤50字符，格式 `开发环境: <OS>/开发工具: <IDE名称>`。",
+            "- 开发该软件的操作系统：≤50字符，填写实际开发电脑的操作系统版本。",
+            "- 该软件的运行平台 / 操作系统：≤50字符，填写软件运行所在的操作系统或浏览器环境。",
+            "- 软件运行支撑环境 / 支持软件：≤50字符，直接列出运行依赖（如 Node.js、npm、浏览器），不加格式前缀。",
+            "- 开发的硬件环境和运行的硬件环境：≤50字符，可使用检测到的电脑配置作为建议值。",
+            "- 源程序量：纯数字（不含'行'字），指全部源程序的总行数。",
+            "- 开发目的：≤50字符，用一句话说明目的，不能只写软件名称。",
+            "- 面向领域 / 行业：≤50字符。",
+            "- 软件的主要功能：500~1300字符。",
+            "- 软件的技术特点：多选标签（APP/游戏软件/教育软件/金融软件/医疗软件/地理信息软件/云计算软件/信息安全软件/大数据软件/人工智能软件/VR软件/5G软件/小程序/物联网软件/智慧城市软件）+ 文本描述≤100字符。",
             "",
             "## 项目分析摘要",
             "",
