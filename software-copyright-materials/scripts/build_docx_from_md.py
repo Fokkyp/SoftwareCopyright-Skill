@@ -298,17 +298,28 @@ def build_code_docx_python(md_path: Path, out_path: Path, software_name: str, ve
     set_style_black(document)
     set_code_header(document, software_name, version)
 
+    # 后30页文档页码从31开始，实现前后文档连续编号1-60
+    start_page_no = pages[0][0] if pages else 1
+    if start_page_no != 1:
+        pg_num_type = OxmlElement("w:pgNumType")
+        pg_num_type.set(qn("w:start"), str(start_page_no))
+        document.sections[0]._sectPr.append(pg_num_type)
+
     for index, (page_no, lines) in enumerate(pages):
         for line in lines:
             p = document.add_paragraph()
             p.paragraph_format.space_before = Pt(0)
             p.paragraph_format.space_after = Pt(0)
             p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
-            p.paragraph_format.line_spacing = Pt(12)
+            p.paragraph_format.line_spacing = Pt(14)
             run = p.add_run(line if line else " ")
             set_run_font(run, "Consolas", 7.2)
         if index != len(pages) - 1:
-            document.add_page_break()
+            # 嵌入式分页符：避免 add_page_break() 产生多余空段落导致空白页
+            run = p.add_run()
+            br = OxmlElement('w:br')
+            br.set(qn('w:type'), 'page')
+            run._r.append(br)
 
     force_black_document(document)
     document.save(out_path)
@@ -387,7 +398,7 @@ def header_xml(header_text: str) -> str:
 </w:hdr>"""
 
 
-def minimal_docx(out_path: Path, body_xml: str, header_text: str | None = None) -> None:
+def minimal_docx(out_path: Path, body_xml: str, header_text: str | None = None, start_page: int = 1) -> None:
     content_types = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
@@ -420,6 +431,7 @@ def minimal_docx(out_path: Path, body_xml: str, header_text: str | None = None) 
     {body_xml}
       <w:sectPr>
         {'<w:headerReference w:type="default" r:id="rIdHeader1"/>' if header_text else ''}
+        {'<w:pgNumType w:start="' + str(start_page) + '"/>' if start_page != 1 else ''}
         <w:pgSz w:w="11906" w:h="16838"/>
       <w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1418" w:header="283" w:footer="283" w:gutter="0"/>
     </w:sectPr>
@@ -544,13 +556,17 @@ def build_code_docx_ooxml(md_path: Path, out_path: Path, software_name: str, ver
     pages = parse_code_pages(md_path)
     if not pages:
         raise RuntimeError(f"No code pages parsed from {md_path}")
+    start_page_no = pages[0][0] if pages else 1
     body: list[str] = []
     for index, (page_no, lines) in enumerate(pages):
         for line in lines:
-            body.append(paragraph_xml(line if line else " ", font="Consolas", size_half_points=14, line_twips=240))
+            body.append(paragraph_xml(line if line else " ", font="Consolas", size_half_points=14, line_twips=280))
         if index != len(pages) - 1:
-            body.append(page_break_xml())
-    minimal_docx(out_path, "\n".join(body), header_text=f"{software_name} {version}")
+            # 嵌入式分页符：嵌入最后一段的 run 避免多余空段落
+            last = body.pop()
+            last = last.replace('</w:r></w:p>', '<w:br w:type="page"/></w:r></w:p>')
+            body.append(last)
+    minimal_docx(out_path, "\n".join(body), header_text=f"{software_name} {version}", start_page=start_page_no)
 
 
 def add_markdown_table(document: Any, rows: list[list[str]]) -> None:

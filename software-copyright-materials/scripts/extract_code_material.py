@@ -231,8 +231,7 @@ def extract(project: Path, out_dir: Path, software_name: str, version: str, line
 
     if total_pages >= SPLIT_THRESHOLD_PAGES:
         front = list(enumerate(pages[:30], start=1))
-        back_start = total_pages - 29
-        back = [(back_start + i, page) for i, page in enumerate(pages[-30:])]
+        back = [(31 + i, page) for i, page in enumerate(pages[-30:])]
         front_path = out_dir / "代码-前30页.md"
         back_path = out_dir / "代码-后30页.md"
         write_pages_md(front_path, "代码材料（前30页）", software_name, version, front)
