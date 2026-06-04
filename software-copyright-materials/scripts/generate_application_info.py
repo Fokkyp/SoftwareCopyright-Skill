@@ -47,6 +47,105 @@ FIELD_ORDER = [
 ]
 
 
+def effective_len(value: str) -> int:
+    return len(str(value or "").replace(" ", "").replace("\n", ""))
+
+
+def clean_text(value: Any) -> str:
+    text = str(value or "").strip()
+    text = re.sub(r"\s+", " ", text)
+    text = text.replace("`", "").replace("#", "").strip()
+    return text
+
+
+def trim_effective(value: str, max_chars: int = MAX_MAIN_FUNCTION_CHARS) -> str:
+    if effective_len(value) <= max_chars:
+        return value
+    result: list[str] = []
+    count = 0
+    for char in value:
+        if char not in (" ", "\n"):
+            count += 1
+        if count > max_chars:
+            break
+        result.append(char)
+    return "".join(result).rstrip("，。；、 ") + "。"
+
+
+def business_feature_pairs(business: dict[str, Any] | None) -> list[tuple[str, str]]:
+    if not business:
+        return []
+    features = business.get("business_features") or []
+    details = business.get("business_feature_details") or {}
+    if not isinstance(features, list):
+        return []
+    if not isinstance(details, dict):
+        details = {}
+    pairs: list[tuple[str, str]] = []
+    for feature in features:
+        name = clean_text(feature)
+        if not name:
+            continue
+        detail = clean_text(details.get(name))
+        pairs.append((name, detail))
+    return pairs
+
+
+def summarize_business_features(software_name: str, business: dict[str, Any] | None) -> str:
+    pairs = business_feature_pairs(business)
+    if not business or not pairs:
+        return ""
+
+    industry = clean_text(business.get("industry"))
+    target_users = business.get("target_users") or []
+    if isinstance(target_users, list):
+        target_text = "、".join(clean_text(item) for item in target_users if clean_text(item))
+    else:
+        target_text = clean_text(target_users)
+    core_value = clean_text(business.get("core_value"))
+    product_positioning = clean_text(business.get("product_positioning"))
+    operation_flow = business.get("operation_flow") or []
+    if isinstance(operation_flow, list):
+        flow_steps = [clean_text(item).rstrip("。") for item in operation_flow if clean_text(item)]
+        flow_text = "，再".join(flow_steps)
+    else:
+        flow_text = clean_text(operation_flow)
+
+    feature_names = "、".join(name for name, _ in pairs[:8])
+    parts: list[str] = []
+    if product_positioning:
+        parts.append(product_positioning.rstrip("。") + "。")
+    else:
+        scope = f"面向{industry}" if industry else "面向实际业务场景"
+        users = f"，服务于{target_text}" if target_text else ""
+        parts.append(f"{software_name}是一套{scope}{users}的应用软件。")
+    parts.append(f"软件主要提供{feature_names}等功能。")
+    if core_value:
+        parts.append(core_value.rstrip("。") + "。")
+
+    for name, detail in pairs[:8]:
+        if detail:
+            detail = detail.rstrip("。")
+            if detail.startswith(("用户", "系统")):
+                parts.append(f"在{name}功能中，{detail}。")
+            else:
+                parts.append(f"{name}功能主要{detail}。")
+        else:
+            parts.append(f"{name}功能支持用户完成相关业务操作，并在处理完成后返回对应结果。")
+
+    if flow_text:
+        parts.append(f"用户通常先{flow_text}，系统在关键步骤提供状态反馈和结果展示。")
+
+    result = "".join(parts)
+    while effective_len(result) < MIN_MAIN_FUNCTION_CHARS:
+        result += (
+            f"围绕{feature_names}等核心功能，软件将用户输入、过程处理、结果查看和资料管理组织在连续的操作流程中，"
+            "用户可以根据页面提示逐步完成业务处理，系统保存必要的数据记录并提供清晰的反馈信息，"
+            "便于用户后续继续查看、复核和调整相关内容。"
+        )
+    return trim_effective(result)
+
+
 def summarize_features(analysis: dict[str, Any], software_name: str, business: dict[str, Any] | None = None) -> str:
     """Generate a substantive main-function description for the application form.
 
@@ -55,6 +154,10 @@ def summarize_features(analysis: dict[str, Any], software_name: str, business: d
     paragraph description targeting the 500-1300 character window required by the
     Chinese copyright office.
     """
+    business_summary = summarize_business_features(software_name, business)
+    if business_summary:
+        return business_summary
+
     features = analysis.get("feature_candidates") or []
     readme = (analysis.get("readme_excerpt") or "").strip()
     routes = analysis.get("routes") or []
@@ -62,6 +165,8 @@ def summarize_features(analysis: dict[str, Any], software_name: str, business: d
     readable_features = []
     for feature in features:
         name = humanize_feature(str(feature))
+        if re.search(r"[A-Za-z]", name):
+            continue
         if name and name not in readable_features:
             readable_features.append(name)
 
@@ -109,11 +214,7 @@ def summarize_features(analysis: dict[str, Any], software_name: str, business: d
 
     result = "".join(parts)
 
-    # Ensure minimum length (use stripped length to match write_application_md check)
-    def _effective_len(s: str) -> int:
-        return len(s.replace(" ", "").replace("\n", ""))
-
-    while _effective_len(result) < MIN_MAIN_FUNCTION_CHARS:
+    while effective_len(result) < MIN_MAIN_FUNCTION_CHARS:
         padding = (
             "此外，系统还提供了配套的数据管理、用户操作记录、状态跟踪和系统配置等辅助功能模块，"
             "各个功能模块之间通过统一的界面布局和操作规范协同运行，用户可以在不同模块间灵活切换和处理跨模块的业务流程。"
@@ -125,10 +226,7 @@ def summarize_features(analysis: dict[str, Any], software_name: str, business: d
         )
         result += padding
 
-    if _effective_len(result) > MAX_MAIN_FUNCTION_CHARS:
-        result = result[:MAX_MAIN_FUNCTION_CHARS]
-
-    return result
+    return trim_effective(result)
 
 
 def humanize_feature(name: str) -> str:
@@ -213,7 +311,7 @@ def build_fields(
 
     # 软件的主要功能：确保业务理解提供的内容也满足最低字数
     main_func = defaults.get("软件的主要功能", "")
-    if main_func and "待用户确认" not in main_func and len(main_func) < MIN_MAIN_FUNCTION_CHARS:
+    if main_func and "待用户确认" not in main_func and effective_len(main_func) < MIN_MAIN_FUNCTION_CHARS:
         defaults["软件的主要功能"] = summarize_features(analysis, software_name, business)
 
     return defaults
