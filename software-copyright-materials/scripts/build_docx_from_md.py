@@ -287,14 +287,18 @@ def set_code_header(document: Any, software_name: str, version: str) -> None:
         tc_pr.append(tc_borders)
 
 
-def build_code_docx_python(md_path: Path, out_path: Path, software_name: str, version: str) -> None:
+def build_code_docx_python(
+    md_path: Path, out_path: Path, software_name: str, version: str, line_start: int = 1
+) -> None:
     pages = parse_code_pages(md_path)
     if not pages:
         raise RuntimeError(f"No code pages parsed from {md_path}")
 
     document = Document()
     configure_code_a4(document)
-    set_normal_font(document, "Consolas", 7.2)
+    # Courier New: macOS/Linux/Windows 全平台自带等宽字体；Consolas 仅 Windows 有，
+    # 缺失时 LibreOffice/Word fallback 到非等宽字体导致代码行 wrap 溢页。
+    set_normal_font(document, "Courier New", 7.0)
     set_style_black(document)
     set_code_header(document, software_name, version)
 
@@ -311,9 +315,14 @@ def build_code_docx_python(md_path: Path, out_path: Path, software_name: str, ve
             p.paragraph_format.space_before = Pt(0)
             p.paragraph_format.space_after = Pt(0)
             p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
-            p.paragraph_format.line_spacing = Pt(14)
-            run = p.add_run(line if line else " ")
-            set_run_font(run, "Consolas", 7.2)
+            # 11pt exact：正文区约 725pt 容 65 行。代码长行在 ~104 列容量下 wrap
+            # （行号前缀占 7 列），最坏 +10 物理行（50+10=60），14pt 行距容量仅 52 行会被撑爆导致跨页漂移。
+            p.paragraph_format.line_spacing = Pt(11)
+            # 2026-03-15 新规：每行前缀右对齐 5 位行号 + 两个空格，行号属于行文本
+            numbered = f"{line_start:>5d}  {line if line else ' '}"
+            line_start += 1
+            run = p.add_run(numbered)
+            set_run_font(run, "Courier New", 7.0)
         if index != len(pages) - 1:
             # 嵌入式分页符：避免 add_page_break() 产生多余空段落导致空白页
             run = p.add_run()
@@ -552,7 +561,9 @@ def add_header_to_existing_docx(docx_path: Path, header_text: str) -> None:
     tmp_path.replace(docx_path)
 
 
-def build_code_docx_ooxml(md_path: Path, out_path: Path, software_name: str, version: str) -> None:
+def build_code_docx_ooxml(
+    md_path: Path, out_path: Path, software_name: str, version: str, line_start: int = 1
+) -> None:
     pages = parse_code_pages(md_path)
     if not pages:
         raise RuntimeError(f"No code pages parsed from {md_path}")
@@ -560,7 +571,11 @@ def build_code_docx_ooxml(md_path: Path, out_path: Path, software_name: str, ver
     body: list[str] = []
     for index, (page_no, lines) in enumerate(pages):
         for line in lines:
-            body.append(paragraph_xml(line if line else " ", font="Consolas", size_half_points=14, line_twips=280))
+            # 与 python-docx 分支同参数：Courier New 7pt + 11pt exact 行距（220 twips）
+            # 2026-03-15 新规：每行前缀右对齐 5 位行号 + 两个空格，与 python-docx 分支一致
+            numbered = f"{line_start:>5d}  {line if line else ' '}"
+            line_start += 1
+            body.append(paragraph_xml(numbered, font="Courier New", size_half_points=14, line_twips=220))
         if index != len(pages) - 1:
             # 嵌入式分页符：嵌入最后一段的 run 避免多余空段落
             last = body.pop()
@@ -694,11 +709,11 @@ def build_with_pandoc(md_path: Path, out_path: Path, code_mode: bool = False) ->
             Path(tmp_name).unlink(missing_ok=True)
 
 
-def build_code_docx(md_path: Path, out_path: Path, software_name: str, version: str) -> None:
+def build_code_docx(md_path: Path, out_path: Path, software_name: str, version: str, line_start: int = 1) -> None:
     if DOCX_AVAILABLE:
-        build_code_docx_python(md_path, out_path, software_name, version)
+        build_code_docx_python(md_path, out_path, software_name, version, line_start)
     else:
-        build_code_docx_ooxml(md_path, out_path, software_name, version)
+        build_code_docx_ooxml(md_path, out_path, software_name, version, line_start)
     normalize_docx_text_color(out_path)
 
 
@@ -739,7 +754,24 @@ def docx_checks(skill_dir: Path, outputs: list[Path]) -> list[str]:
     return notes
 
 
-def build_all(workdir: Path, software_name: str, version: str, skip_preview: bool) -> dict[str, Any]:
+def resolve_code_total_lines(draft_dir: Path, override: int | None) -> int | None:
+    """代码总有效行数：优先 CLI 覆盖值，否则读 代码提取清单.json 的 selected_source_line_count。"""
+    if override is not None:
+        return override
+    manifest = read_json_if_exists(draft_dir / "代码提取清单.json")
+    try:
+        return int(manifest.get("selected_source_line_count"))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def build_all(
+    workdir: Path,
+    software_name: str,
+    version: str,
+    skip_preview: bool,
+    code_total_lines_override: int | None = None,
+) -> dict[str, Any]:
     workdir = ensure_dir(workdir)
     draft_dir = workdir / "草稿"
     final_dir = ensure_dir(workdir / "正式资料")
@@ -771,16 +803,27 @@ def build_all(workdir: Path, software_name: str, version: str, skip_preview: boo
         outputs.append(app_txt)
     warnings.extend(app_warnings)
 
+    code_total_lines = resolve_code_total_lines(draft_dir, code_total_lines_override)
     code_specs = [
-        ("代码-前30页.md", f"{safe_name}-代码(前30页).docx"),
-        ("代码-后30页.md", f"{safe_name}-代码(后30页).docx"),
-        ("代码-全部.md", f"{safe_name}-代码(全部).docx"),
+        # (md 文件名, 输出 docx 名, 起始行号；None = 尾册，从总有效行倒推)
+        ("代码-前30页.md", f"{safe_name}-代码(前30页).docx", 1),
+        ("代码-后30页.md", f"{safe_name}-代码(后30页).docx", None),
+        ("代码-全部.md", f"{safe_name}-代码(全部).docx", 1),
     ]
-    for md_name, docx_name in code_specs:
+    for md_name, docx_name, line_start in code_specs:
         md_path = draft_dir / md_name
         if md_path.exists():
+            if line_start is None:
+                # 尾册行号 = 总有效行 − 本册行数 + 1，保证末行号恰为 code_total_lines
+                total = sum(len(lines) for _, lines in parse_code_pages(md_path))
+                if code_total_lines is None:
+                    raise RuntimeError(
+                        f"无法确定 {md_name} 的起始行号：缺少 代码提取清单.json 的 "
+                        "selected_source_line_count，可用 --code-total-lines 显式指定"
+                    )
+                line_start = code_total_lines - total + 1
             out_path = final_dir / docx_name
-            build_code_docx(md_path, out_path, final_software_name, final_version)
+            build_code_docx(md_path, out_path, final_software_name, final_version, line_start)
             outputs.append(out_path)
 
     manual_md = draft_dir / "操作手册.md"
@@ -835,6 +878,12 @@ def main() -> None:
     parser.add_argument("--software-name", required=True)
     parser.add_argument("--version", default="V1.0")
     parser.add_argument("--skip-preview", action="store_true")
+    parser.add_argument(
+        "--code-total-lines",
+        type=int,
+        default=None,
+        help="代码总有效行数（尾册起始行号 = 该值 − 尾册行数 + 1）；默认读 草稿/代码提取清单.json 的 selected_source_line_count",
+    )
     args = parser.parse_args()
 
     workdir = Path(args.workdir)
@@ -846,7 +895,7 @@ def main() -> None:
             print(f"- {issue}")
         raise SystemExit(2)
 
-    result = build_all(workdir, args.software_name, args.version, args.skip_preview)
+    result = build_all(workdir, args.software_name, args.version, args.skip_preview, args.code_total_lines)
     print(f"OK final materials: {Path(args.workdir) / '正式资料'}")
     for output in result["outputs"]:
         print(output)
