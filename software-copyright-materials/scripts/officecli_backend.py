@@ -199,6 +199,9 @@ class OfficeCli:
         return self._run(["view", str(output.resolve()), "issues", "--json"], timeout=180)
 
     def stats(self, output: Path, *, native_page_count: bool = False) -> dict[str, Any]:
+        # OfficeCLI only repaginates through Word on Windows; elsewhere --page-count
+        # silently returns its own estimate, which must not be treated as Word's count.
+        native_page_count = native_page_count and os.name == "nt"
         args = ["view", str(output.resolve()), "stats"]
         if native_page_count:
             args.append("--page-count")
