@@ -167,7 +167,7 @@ def document_commands(software_name: str, version: str, *, code_mode: bool, page
         {"command": "set", "path": "/", "props": {
             "docDefaults.font": "SimSun", "docDefaults.font.eastAsia": "SimSun",
             "docDefaults.font.hAnsi": "Times New Roman", "docDefaults.fontSize": default_size,
-            "docDefaults.color": "#000000", "updateFields": "true",
+            "docDefaults.color": "#000000",
             "title": f"{software_name} {version}"}},
         {"command": "set", "path": "/section[1]", "props": {
             "pageWidth": "21cm", "pageHeight": "29.7cm", "orientation": "portrait",
