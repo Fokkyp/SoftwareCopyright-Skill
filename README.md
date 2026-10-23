@@ -190,7 +190,15 @@ officecli --version
 
 ## 开源协议
 
-本项目采用 [MIT License](LICENSE) 开源。你可以自由使用、复制、修改、分发，也可以基于它继续开发自己的版本。使用者仍需自行核对生成材料是否符合实际项目和官网当前要求。
+Copyright (c) 2026 Software Copyright Materials contributors
+
+本项目采用 [GNU Affero General Public License v3.0（AGPL-3.0-only）](LICENSE) 开源。
+
+商业使用须遵守 AGPLv3 的全部适用条款。对于违反本协议的商业使用行为，本人保留依法追究法律责任、要求停止侵权及主张损害赔偿的权利。本声明不限制 AGPLv3 授予的合法商业使用权利。
+
+本项目允许依照 AGPLv3 进行商业使用。如需获得不受 AGPLv3 开源义务约束的商业授权，请邮件联系本人。
+
+使用者仍需自行核对生成材料是否符合实际项目和官网当前要求。
 
 ## 代码材料说明
 
