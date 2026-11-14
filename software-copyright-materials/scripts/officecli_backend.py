@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -33,6 +34,51 @@ def resolve_officecli() -> Path | None:
             if path.is_file():
                 return path.resolve()
     return None
+
+
+def resolve_wps() -> Path | None:
+    """解析社区工具 wps-cli 的可执行文件
+
+    先查当前进程 PATH，再查运行本脚本的 Python 的 Scripts 目录
+    """
+    for name in ("wps", "wps.exe"):
+        found = shutil.which(name)
+        if found:
+            path = Path(found)
+            if path.is_file():
+                return path.resolve()
+    scripts = Path(sys.executable).resolve().parent / "Scripts" / "wps.exe"
+    return scripts.resolve() if scripts.is_file() else None
+
+
+def wps_page_count(docx: Path) -> int | None:
+    """用 wps writer info 读取 WPS 文字组件统计的页数
+
+    页数来自 WPS 分页统计里的 data.pages，不是 HTML 估算
+    找不到命令、WPS 未安装、调用失败或 JSON 里没有页数时返回 None，不中断生成
+    """
+    executable = resolve_wps()
+    if executable is None:
+        return None
+    try:
+        completed = subprocess.run(
+            [str(executable), "writer", "info", str(docx.resolve()), "--json"],
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            capture_output=True,
+            timeout=180,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    combined = "\n".join(part for part in (completed.stdout, completed.stderr) if part)
+    payload = _parse_json_output(combined)
+    data = payload.get("data")
+    pages = data.get("pages") if isinstance(data, dict) else None
+    try:
+        return int(pages) if pages is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 def pending_windows_officecli_install() -> Path | None:

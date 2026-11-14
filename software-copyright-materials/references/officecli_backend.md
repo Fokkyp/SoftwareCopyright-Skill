@@ -38,7 +38,7 @@ irm https://raw.githubusercontent.com/iOfficeAI/OfficeCLI/main/install.ps1 | iex
 1. `officecli validate <file> --json`：OpenXML 结构错误必须为 0，否则生成失败。
 2. 重新读取 `/theme`，确认六个主题字体槽均为 Times New Roman / SimSun，避免 WPS 因默认的 Calibri、Calibri Light、等线主题字体提示缺失字体。
 3. `officecli view <file> issues --json`：内容/格式提示写入生成报告，不能把它误当成结构校验。
-4. Windows 且安装 Microsoft Word 时，对代码材料执行 `view stats --page-count --json`，把自动分页后的真实页数写入报告。Markdown 页分组只代表选材估算；但前 30 页/后 30 页文档的 Word 实际页数必须分别为 30，否则正式生成失败并要求重新校准选材量。
+4. Windows 且安装 Microsoft Word 时，对代码材料执行 `view stats --page-count --json`，把自动分页后的真实页数写入报告。Word 不可用时改用 `wps writer info <file> --json` 返回的 `pages`，该数字是 WPS 文字组件的分页统计，不是 HTML 估算。Markdown 页分组只代表选材估算；但前 30 页/后 30 页文档的 Word 或 WPS 实际页数必须分别为 30，否则正式生成失败并要求重新校准选材量。WPS 命令缺失、WPS 未安装或返回里没有页数时，仍保留“无法取得 Word 原生页数，请用 Word/WPS 人工复核”的提示。
 5. 生成全页联系表预览用于快速目检。OfficeCLI 的 HTML 渲染不能替代 Word/WPS 的最终分页复核。
 
 用户确认会记录内容指纹。业务理解、代码选择、申请表或最终草稿被修改后，正式生成必须拒绝沿用旧确认，待用户重新核对并记录对应门禁。
