@@ -23,7 +23,14 @@ from common import (
     read_json,
     safe_filename,
 )
-from officecli_backend import OfficeCli, OfficeCliError, issue_count, json_data, structural_error_count
+from officecli_backend import (
+    OfficeCli,
+    OfficeCliError,
+    issue_count,
+    json_data,
+    structural_error_count,
+    wps_page_count,
+)
 
 
 DRAWINGML_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -471,8 +478,47 @@ def build_manual_docx(
             prepared.unlink(missing_ok=True)
 
 
+def _requires_exact_thirty_pages(output: Path, estimated: int) -> bool:
+    """判断这份代码文档是否必须恰好为 30 页
+
+    只约束文件名带前 30 页或后 30 页、且选材估算也是 30 的文档
+    """
+    return estimated == 30 and any(marker in output.name for marker in ("(前30页)", "(后30页)"))
+
+
+def _wps_page_notes(output: Path, estimated: int) -> list[str]:
+    """Word 页数为空时，用 WPS 页数核对代码文档并生成报告条目
+
+    读到页数且前后 30 页不是 30 页时中止生成；读不到时保留人工复核提示
+    """
+    pages = wps_page_count(output)
+    if pages is None:
+        return [
+            f"- `{output.name}`：当前环境无法取得 Word 原生页数；草稿按 {estimated} 页估算，"
+            "提交前需在 Word/WPS 中复核自动分页结果。"
+        ]
+    if pages != estimated and _requires_exact_thirty_pages(output, estimated):
+        raise OfficeCliError(
+            f"{output.name} 经 WPS 自动分页后为 {pages} 页，不是要求的 30 页。"
+            "请根据生成报告重新校准代码选材量后再生成，不能把页数不符的文档作为正式资料。"
+        )
+    if pages != estimated:
+        return [
+            f"- `{output.name}`：Word 原生页数不可用，WPS 自动分页为 {pages} 页，"
+            f"草稿选材估算为 {estimated} 页；文档未插入人工分页符。"
+        ]
+    return [
+        f"- `{output.name}`：Word 原生页数不可用，WPS 自动分页为 {pages} 页，"
+        "与草稿选材估算一致；文档未插入人工分页符。"
+    ]
+
+
 def docx_checks(cli: OfficeCli, outputs: list[Path], estimated_pages: dict[Path, int], preview_dir: Path,
                 render_preview: bool = True) -> list[str]:
+    """校验 DOCX 结构，并在 Word 页数缺失时用 WPS 真实页数核对代码材料
+
+    前 30 页或后 30 页不是 30 页时中止生成；WPS 也不可用时只保留人工复核提示
+    """
     notes: list[str] = []
     if render_preview:
         ensure_dir(preview_dir)
@@ -492,10 +538,7 @@ def docx_checks(cli: OfficeCli, outputs: list[Path], estimated_pages: dict[Path,
         pages = json_data(stats).get("pages")
         if estimated is not None:
             if pages is None:
-                notes.append(
-                    f"- `{output.name}`：当前环境无法取得 Word 原生页数；草稿按 {estimated} 页估算，"
-                    "提交前需在 Word/WPS 中复核自动分页结果。"
-                )
+                notes.extend(_wps_page_notes(output, estimated))
             elif int(pages) != estimated and estimated == 30 and any(
                 marker in output.name for marker in ("(前30页)", "(后30页)")
             ):
