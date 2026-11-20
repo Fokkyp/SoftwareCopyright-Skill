@@ -263,8 +263,10 @@ def write_model_template(path: Path, evidence: dict[str, Any]) -> None:
         "glossary": [
             {"term": "当前软件中的业务术语", "definition": "用普通中文解释含义。"}
         ],
+        "related_documents": [],
         "model_review_notes": [
-            "操作手册应采用软著审核友好的通用骨架：相关文档、说明、功能特点、系统要求、按真实页面/流程逐章操作、常见问题、术语表。",
+            "操作手册应采用软著审核友好的通用骨架：说明、功能特点、系统要求、按真实页面/流程逐章操作、常见问题、术语表。",
+            "related_documents 默认留空，此时操作手册不生成“相关文档”章节。软著文档鉴别材料只提交一份文档，审核员看不到其他配套资料；只有用户明确要求、且文档真实存在时才填写 {\"name\", \"target\", \"description\"}，不得填写项目中不存在的文档。",
             "manual_modules 要按当前项目真实页面、导航入口、按钮、输入限制、系统反馈和截图位置编写，不能只写抽象功能名。",
             "不要照抄范本文案；范本只说明手册需要具体、可操作、能给审核员看懂。",
             "不要用关键词表决定行业和功能；必须能从项目证据或用户补充中解释来源。",
@@ -360,6 +362,9 @@ def normalize_model_context(model: dict[str, Any], evidence: dict[str, Any], web
         raise SystemExit("Model context field must be a list: glossary")
     if not glossary:
         raise SystemExit("Model context field cannot be empty: glossary")
+    related_documents = model.get("related_documents") or []
+    if not isinstance(related_documents, list):
+        raise SystemExit("Model context field must be a list: related_documents")
     context = {
         "software_name": evidence["software_name"],
         "business_understanding_required": True,
@@ -382,6 +387,7 @@ def normalize_model_context(model: dict[str, Any], evidence: dict[str, Any], web
         "system_requirements": system_requirements,
         "faq": faq,
         "glossary": glossary,
+        "related_documents": related_documents,
         "model_authored": True,
         "external_research_notes": web_notes,
         "confirmation_required": True,
