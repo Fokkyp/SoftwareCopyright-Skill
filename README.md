@@ -105,7 +105,7 @@ cp -R software-copyright-materials "$PROJECT_SKILLS_DIR/"
 
 - **支持 Skill 的 coding agent 软件**：能够从本地 skill 目录加载 `software-copyright-materials/`。
 - **Python 3.10+**：用于项目分析、草稿生成、代码抽取、门禁和 OfficeCLI 命令编排。可以使用 coding agent 自带的 Python 运行时，无需另外安装 `python-docx`。
-- **全局安装的 OfficeCLI 1.0.151**：正式 Word 统一由 OfficeCLI 生成、校验和预览。仓库不复制 OfficeCLI 二进制，也不再使用 LibreOffice、Pandoc、内置 DOCX skill、.NET 工具包或项目内便携版兜底。
+- **全局安装的 OfficeCLI 1.0.162**：正式 Word 统一由 OfficeCLI 生成、校验和预览。仓库不复制 OfficeCLI 二进制，也不再使用 LibreOffice、Pandoc、内置 DOCX skill、.NET 工具包或项目内便携版兜底。
 - 生成完成后会继续通过 OfficeCLI 统一 DOCX 主题字体为宋体和 Times New Roman，并重新读取主题校验，避免 WPS 因默认的等线、Calibri、Calibri Light 提示缺失字体。
 - **可读取的项目源码**：代码材料必须从真实项目中抽取，所以需要在代码助手中打开或指定你的项目目录。
 
@@ -125,10 +125,10 @@ curl -fsSL https://raw.githubusercontent.com/iOfficeAI/OfficeCLI/main/install.sh
 
 ```bash
 officecli --version
-# 预期输出：1.0.151
+# 预期输出：1.0.162
 ```
 
-当前 skill 固定验证 [OfficeCLI v1.0.151](https://github.com/iOfficeAI/OfficeCLI/releases/tag/v1.0.151)。运行时只使用 PATH 中的全局 `officecli`，不使用 `OFFICECLI_PATH`、`--officecli` 或项目内 `工具/officecli.exe`。生成脚本会禁用 OfficeCLI 自动更新，以避免同一份材料因工具版本漂移产生不同结果。
+当前 skill 固定验证 [OfficeCLI v1.0.162](https://github.com/iOfficeAI/OfficeCLI/releases/tag/v1.0.162)。运行时只使用 PATH 中的全局 `officecli`，不使用 `OFFICECLI_PATH`、`--officecli` 或项目内 `工具/officecli.exe`。生成脚本会禁用 OfficeCLI 自动更新，以避免同一份材料因工具版本漂移产生不同结果。
 
 ### 可选能力
 
@@ -154,7 +154,7 @@ officecli --version
 
 - 当前 Python 是否满足 3.10+。
 - Markdown 草稿、TXT、OfficeCLI DOCX、OpenXML 校验和预览是否可用。
-- 当前 OfficeCLI 路径和版本是否为固定验证版本 `1.0.151`。
+- 当前 OfficeCLI 路径和版本是否为固定验证版本 `1.0.162`。
 - OfficeCLI 是已就绪、尚未全局安装，还是安装后需要重启 coding agent 才能刷新 PATH。
 - 当前平台是否可能使用 Word 原生页数校验。
 - 当前会把材料生成到哪里。
@@ -162,7 +162,7 @@ officecli --version
 如果 OfficeCLI 缺失或版本不匹配，代码助手会停下来让你选择：
 
 1. 使用官方安装脚本全局安装，安装后重启 coding agent 并重新检查。
-2. 切换到固定验证版本 `1.0.151`。
+2. 切换到固定验证版本 `1.0.162`。
 3. 明确承担兼容性风险并使用其他版本（生成时必须显式传入 `--allow-untested-officecli`）。
 
 没有可用 OfficeCLI 时不会伪装生成 DOCX，也不会自动回退到另一套写入实现。它不会在你不确认的情况下静默安装依赖。
