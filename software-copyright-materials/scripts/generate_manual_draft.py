@@ -20,61 +20,63 @@ def join_items(items: list[str], limit: int = 4) -> str:
 
 
 def plain_manual_text(text: str) -> str:
-    value = text
-    replacements = {
-        "多 Agent": "多智能体",
-        "多 agent": "多智能体",
-        "业务逻辑": "使用过程",
-        "前端页面": "软件页面",
-        "前端": "界面",
-        "后端服务": "系统服务",
-        "后端": "系统服务",
-        "接口": "数据通道",
-        "组件": "页面组成部分",
-        "路由": "页面入口",
-        "状态管理": "状态记录",
-        "数据持久化": "数据保存",
-        "异步任务": "后台处理任务",
-        "任务队列": "任务处理服务",
-        "模型": "智能服务",
-        "调度中心": "协调中心",
-        "结构化依据": "后续说明",
-        "高成本生成": "耗时较长的内容生成",
-    }
-    for source, target in replacements.items():
-        value = value.replace(source, target)
-    value = re.sub(r"(?<![A-Za-z])Agent(?![A-Za-z])", "智能体", value)
-    value = re.sub(r"(?<![A-Za-z])agent(?![A-Za-z])", "智能体", value)
-    value = re.sub(r"\b(?!Node\.js\b)[A-Za-z]+\.js\b", "相关软件能力", value)
-    value = re.sub(r"\bReact\b|\bVue\b|\bVite\b|\bNext\b|\bNext\.js\b|\bFastAPI\b|\bLangGraph\b|\bCelery\b|\bSSE\b", "相关软件能力", value)
-    value = re.sub(r"相关软件能力、相关软件能力", "相关软件能力", value)
-    value = re.sub(r"多智能体\s+协作", "多智能体协作", value)
-    return value
+    """Keep model-authored wording as-is; only trim surrounding whitespace.
+
+    Wording is never rewritten by keyword here. The same word means different
+    things in different domains (e.g. "模型" is a mesh or 3D model in CAE/BIM
+    software and an LLM in AI apps), so any replacement table breaks some
+    projects. Technical wording is reported by ``technical_term_hits`` in the
+    self-review instead, and the model rewrites ``manual_modules`` itself.
+    """
+    return str(text).strip()
 
 
 def plain_feature_name(name: str) -> str:
     value = plain_manual_text(str(name))
-    value = value.replace("Chat", "对话")
-    return value.strip() or "核心功能"
+    return value or "核心功能"
 
 
+# Only terms that describe how the software is built, never what it does for
+# the user. Domain words such as 模型、接口、组件、框架、路由 are deliberately
+# absent: they are ordinary business vocabulary in many projects.
 TECHNICAL_TERMS = [
     "技术实现",
     "代码实现",
     "源码结构",
-    "框架",
+    "前端页面",
+    "后端服务",
     "接口封装",
     "状态管理",
     "异步任务",
     "任务队列",
     "数据持久化",
     "业务逻辑",
-    "React",
-    "Next.js",
-    "FastAPI",
-    "LangGraph",
-    "Celery",
 ]
+
+TECHNICAL_TERM_PATTERNS = [
+    r"(?<![A-Za-z])React(?![A-Za-z])",
+    r"(?<![A-Za-z])Vue(?![A-Za-z])",
+    r"(?<![A-Za-z])Vite(?![A-Za-z])",
+    r"(?<![A-Za-z])Next\.js(?![A-Za-z])",
+    r"(?<![A-Za-z])FastAPI(?![A-Za-z])",
+    r"(?<![A-Za-z])LangGraph(?![A-Za-z])",
+    r"(?<![A-Za-z])Celery(?![A-Za-z])",
+]
+
+
+def technical_term_hits(text: str) -> list[str]:
+    """Return one issue per technical term found, with a short context snippet."""
+    hits: list[str] = []
+    patterns = [re.escape(term) for term in TECHNICAL_TERMS] + TECHNICAL_TERM_PATTERNS
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if not match:
+            continue
+        start = max(0, match.start() - 12)
+        end = min(len(text), match.end() + 12)
+        snippet = text[start:end].replace("\n", " ").strip()
+        hits.append(f"存在偏技术表达：{match.group(0)}（“…{snippet}…”），请在 manual_modules 中改写为用户视角的说法")
+    return hits
 
 TEMPLATE_MARKERS = [
     "重要功能之一",
@@ -138,9 +140,7 @@ def manual_quality_issues(text: str, modules: list[dict[str, Any]]) -> list[str]
     related_body = manual_section_body(text, "相关文档")
     if related_body and "| 文档名称 |" not in related_body:
         issues.append("相关文档章节应使用表格指向配套文档")
-    for term in TECHNICAL_TERMS:
-        if term in text:
-            issues.append(f"存在偏技术表达：{term}")
+    issues.extend(technical_term_hits(text))
     for marker in TEMPLATE_MARKERS:
         if marker in text:
             issues.append(f"存在模板化表达：{marker}")
@@ -545,14 +545,6 @@ def tidy_manual_output(text: str) -> str:
         "用户主要处理处理": "用户主要处理",
         "主要处理承载一次": "主要围绕一次",
         "用户可以看到用户可以看到": "用户可以看到",
-        "处理结束后会反馈空对话": "处理结束后会显示空对话",
-        "在AI ": "在 AI ",
-        "把StudioAgent": "把 StudioAgent",
-        "页面上的StudioAgent": "页面上的 StudioAgent",
-        "看到StudioAgent": "看到 StudioAgent",
-        "提供StudioAgent": "提供 StudioAgent",
-        "进入StudioAgent": "进入 StudioAgent",
-        "保证StudioAgent": "保证 StudioAgent",
     }
     value = text
     for source, target in replacements.items():
