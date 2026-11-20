@@ -41,7 +41,7 @@ metadata:
 - 截图方式只允许用户选择：Playwright CLI 自动截图或用户自行截图。用户选择自动截图后，先检查固定验证版本的 `playwright-cli` 是否可用；如果用户说现在不截图、先跳过截图或截图失败，操作手册仍必须保留清晰可见的截图预留位置，正式 Word 中也要能看到。
 - 申请表信息中的硬件/系统环境必须让用户确认或填写，不能硬编码。
 - Word 生成统一使用 OfficeCLI 后端；Python 只负责业务分析、代码抽取、门禁和命令编排，不直接解包、重打包或写入 DOCX 包。OfficeCLI 完成正文写入后，必须通过 `/theme` + `raw-set` 把主题字体统一为宋体（SimSun）和 Times New Roman，并重新读取主题确认 Calibri、Calibri Light、等线等默认主题字体已消失。
-- OfficeCLI 固定验证版本为 `1.0.151`，运行时必须设置 `OFFICECLI_SKIP_UPDATE=1`，不得静默升级、静默安装或回退到 python-docx/Pandoc/.NET 工具包。
+- OfficeCLI 固定验证版本为 `1.0.162`，运行时必须设置 `OFFICECLI_SKIP_UPDATE=1`，不得静默升级、静默安装或回退到 python-docx/Pandoc/.NET 工具包。
 - OfficeCLI 的安装、批处理、分页与校验细节见 `references/officecli_backend.md`。
 
 ## 路径与按需参考
@@ -97,7 +97,7 @@ metadata:
 
 - 当前会在“当前目录/软件著作权申请资料”下生成材料。
 - Markdown 草稿、TXT、OfficeCLI DOCX、OpenXML 校验和预览是否可用。
-- 当前 OfficeCLI 路径、版本，以及是否等于固定验证版本 `1.0.151`。
+- 当前 OfficeCLI 路径、版本，以及是否等于固定验证版本 `1.0.162`。
 - 如 OfficeCLI 缺失，询问用户是否使用官方命令全局安装；不得下载到项目目录或 skill 目录，也不得静默安装。
 - 如官方全局安装已完成但当前进程尚未识别，必须要求用户重启 Codex，停止当前执行，重启后重新运行环境检查。
 

@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import Any
 
 
-TESTED_OFFICECLI_VERSION = "1.0.151"
-OFFICECLI_DOWNLOAD_URL = "https://github.com/iOfficeAI/OfficeCLI/releases/tag/v1.0.151"
+TESTED_OFFICECLI_VERSION = "1.0.162"
+OFFICECLI_DOWNLOAD_URL = "https://github.com/iOfficeAI/OfficeCLI/releases/tag/v1.0.162"
 OFFICECLI_INSTALL_URL = "https://raw.githubusercontent.com/iOfficeAI/OfficeCLI/main/install.ps1"
 OFFICECLI_INSTALL_COMMAND = f"irm {OFFICECLI_INSTALL_URL} | iex"
 
