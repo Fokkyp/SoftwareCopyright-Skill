@@ -129,7 +129,7 @@ def manual_section_body(text: str, title: str) -> str:
 
 def manual_quality_issues(text: str, modules: list[dict[str, Any]]) -> list[str]:
     issues: list[str] = []
-    required_sections = ["相关文档", "说明", "功能特点", "系统要求", "常见问题解答", "术语表"]
+    required_sections = ["说明", "功能特点", "系统要求", "常见问题解答", "术语表"]
     for title in required_sections:
         if not manual_section_body(text, title):
             issues.append(f"缺少通用手册章节：{title}")
@@ -427,9 +427,10 @@ def normalize_related_documents(business: dict[str, Any] | None) -> list[dict[st
                         "description": describe_related_doc(name),
                     }
                 )
-    if not rows:
-        for name in ("总体设计", "详细设计", "测试案例"):
-            rows.append({"name": name, "target": f"《{name}》", "description": describe_related_doc(name)})
+    # No fallback rows: software copyright review only receives one document
+    # (usually this manual), so listing design/test documents that do not exist
+    # or are not submitted only confuses the examiner. Without real entries the
+    # chapter is omitted.
     return rows
 
 
@@ -630,14 +631,18 @@ def render_manual_canonical(
         if isinstance(section, dict) and section.get("paragraphs") and len(overview_paragraphs) < 4:
             overview_paragraphs.extend(as_text_list(section.get("paragraphs"))[:2])
 
-    lines = [f"# {software_name}操作手册", "", section_heading(1, "相关文档"), ""]
-    lines.extend(["| 文档名称 | 指向资料 | 说明 |", "| --- | --- | --- |"])
-    for item in related_documents:
-        lines.append(f"| {item['name']} | {item['target']} | {item['description']} |")
+    section_no = 1
+    lines = [f"# {software_name}操作手册", ""]
+    if related_documents:
+        lines.extend([section_heading(section_no, "相关文档"), ""])
+        lines.extend(["| 文档名称 | 指向资料 | 说明 |", "| --- | --- | --- |"])
+        for item in related_documents:
+            lines.append(f"| {item['name']} | {item['target']} | {item['description']} |")
+        lines.append("")
+        section_no += 1
     lines.extend(
         [
-            "",
-            section_heading(2, "说明"),
+            section_heading(section_no, "说明"),
             "",
             f"{software_name} {version}适用于{industry_text}场景。用户进入系统后，可以围绕实际工作内容完成账号进入、业务创建、过程查看、结果确认和资料管理等操作。",
             "",
@@ -653,13 +658,13 @@ def render_manual_canonical(
         [
             "本手册用于说明软件的用途、功能特点、运行要求和页面操作流程。各功能章节按用户能够看到的页面、入口、按钮、输入项、提示信息和处理结果进行说明。",
             "",
-            section_heading(3, "功能特点"),
+            section_heading(section_no + 1, "功能特点"),
             "",
         ]
     )
     for i, module in enumerate(modules[:8], start=1):
         lines.extend([feature_paragraph(module, i), ""])
-    lines.extend([section_heading(4, "系统要求"), "", "| 系统要求 | 最低配置 | 推荐配置 |", "| --- | --- | --- |"])
+    lines.extend([section_heading(section_no + 2, "系统要求"), "", "| 系统要求 | 最低配置 | 推荐配置 |", "| --- | --- | --- |"])
     for row in system_rows:
         lines.append(f"| {row['item']} | {row['minimum']} | {row['recommended']} |")
     lines.extend(
@@ -669,7 +674,7 @@ def render_manual_canonical(
             "",
         ]
     )
-    next_index = append_modules_canonical(lines, modules, start_index=5)
+    next_index = append_modules_canonical(lines, modules, start_index=section_no + 3)
     if flow:
         next_index = append_flow_canonical(lines, software_name, flow, start_index=next_index)
     lines.extend([section_heading(next_index, "常见问题解答"), ""])
