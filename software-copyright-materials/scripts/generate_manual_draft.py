@@ -95,6 +95,9 @@ TEMPLATE_MARKERS = [
     "操作结果与反馈：",
     "功能特点根据当前项目资料",
     "软件围绕",
+    "手册用于",
+    "账号进入、业务创建",
+    "再选择或创建业务对象",
 ]
 
 AI_TONE_MARKERS = [
@@ -381,10 +384,12 @@ def remove_opening_definition(text: str, software_name: str) -> str:
 
 def flow_summary(flow: list[str], modules: list[dict[str, Any]]) -> str:
     if flow:
-        pieces = [strip_sentence_punctuation(plain_manual_text(item)) for item in flow[:4]]
+        # Keep every step the model wrote; truncating to the first few steps
+        # used to drop the end of the workflow (checking results, saving).
+        pieces = [strip_sentence_punctuation(plain_manual_text(item)) for item in flow]
         pieces = [item for item in pieces if item]
         if pieces:
-            return "；".join(pieces) + "。"
+            return "".join(piece + "。" for piece in pieces)
     names = [module["feature"] for module in modules[:4]]
     if names:
         return f"用户可依次使用{natural_join(names)}等页面完成主要工作。"
@@ -595,8 +600,6 @@ def append_flow_canonical(lines: list[str], software_name: str, flow: list[str],
         [
             section_heading(start_index, "典型使用流程"),
             "",
-            f"用户完成一次完整业务时，通常先进入{software_name}，再选择或创建业务对象，随后按照页面提示处理内容并查看结果。",
-            "",
             flow_summary(flow, []),
             "",
         ]
@@ -616,8 +619,7 @@ def render_manual_canonical(
     manual_sections: list[Any] | None = None,
     business: dict[str, Any] | None = None,
 ) -> str:
-    industry_text = "相关业务" if not industry or industry == "待用户确认" else industry
-    user_text = join_items([user for user in users if user != "待用户确认"]) or "实际使用人员"
+    user_items = [strip_sentence_punctuation(str(user)) for user in users or [] if str(user).strip() and user != "待用户确认"]
     positioning_text = remove_opening_definition(positioning, software_name)
     core_value_text = clean_field(core_value, "软件可以帮助用户统一处理相关业务资料，并减少重复操作。")
     flow = operation_flow
@@ -625,10 +627,19 @@ def render_manual_canonical(
     system_rows = normalize_system_requirements(business)
     faq_items = normalize_faq(business, software_name)
     glossary_items = normalize_glossary(business, modules, software_name)
+    # Model-written manual_sections paragraphs are kept in full. A section
+    # titled “系统要求” is placed under the requirements table; every other
+    # section supplements the 说明 chapter.
     overview_paragraphs: list[str] = []
+    requirement_paragraphs: list[str] = []
     for section in manual_sections or []:
-        if isinstance(section, dict) and section.get("paragraphs") and len(overview_paragraphs) < 4:
-            overview_paragraphs.extend(as_text_list(section.get("paragraphs"))[:2])
+        if not isinstance(section, dict) or not section.get("paragraphs"):
+            continue
+        paragraphs = [str(item).strip() for item in section.get("paragraphs") or [] if str(item).strip()]
+        if str(section.get("title") or "").strip() == "系统要求":
+            requirement_paragraphs.extend(paragraphs)
+        else:
+            overview_paragraphs.extend(paragraphs)
 
     lines = [f"# {software_name}操作手册", "", section_heading(1, "相关文档"), ""]
     lines.extend(["| 文档名称 | 指向资料 | 说明 |", "| --- | --- | --- |"])
@@ -639,20 +650,23 @@ def render_manual_canonical(
             "",
             section_heading(2, "说明"),
             "",
-            f"{software_name} {version}适用于{industry_text}场景。用户进入系统后，可以围绕实际工作内容完成账号进入、业务创建、过程查看、结果确认和资料管理等操作。",
-            "",
-            f"日常使用时，{user_text}可以按照页面提示从入口进入相应页面，查看当前业务状态，并根据页面中的按钮、输入框、列表或弹窗继续处理。{core_value_text}",
-            "",
         ]
     )
+    # The 说明 chapter only uses model-authored content from the confirmed
+    # business understanding. Fixed sentences such as “账号进入、业务创建……”
+    # or “本手册用于说明……” were removed: they appeared verbatim in every
+    # manual regardless of the software and read as boilerplate.
     if positioning_text:
         lines.extend([positioning_text, ""])
-    for paragraph in overview_paragraphs:
-        lines.extend([paragraph, ""])
+    if core_value_text:
+        lines.extend([core_value_text, ""])
+    if overview_paragraphs:
+        for paragraph in overview_paragraphs:
+            lines.extend([paragraph, ""])
+    elif user_items:
+        lines.extend([f"{software_name}主要供以下人员使用：{'；'.join(user_items)}。", ""])
     lines.extend(
         [
-            "本手册用于说明软件的用途、功能特点、运行要求和页面操作流程。各功能章节按用户能够看到的页面、入口、按钮、输入项、提示信息和处理结果进行说明。",
-            "",
             section_heading(3, "功能特点"),
             "",
         ]
@@ -662,13 +676,9 @@ def render_manual_canonical(
     lines.extend([section_heading(4, "系统要求"), "", "| 系统要求 | 最低配置 | 推荐配置 |", "| --- | --- | --- |"])
     for row in system_rows:
         lines.append(f"| {row['item']} | {row['minimum']} | {row['recommended']} |")
-    lines.extend(
-        [
-            "",
-            f"请确保实际运行环境满足以上要求，以保证{software_name}能够正常打开页面、提交操作和展示处理结果。若部署方式、客户端形态或服务器环境与本表不同，应以实际确认的申请表环境字段为准。",
-            "",
-        ]
-    )
+    lines.append("")
+    for paragraph in requirement_paragraphs:
+        lines.extend([paragraph, ""])
     next_index = append_modules_canonical(lines, modules, start_index=5)
     if flow:
         next_index = append_flow_canonical(lines, software_name, flow, start_index=next_index)
